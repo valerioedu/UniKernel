@@ -11,12 +11,13 @@ project(valerioedx ASM C CXX)
 
 set(ARCH "AArch64")
         
-set(CMAKE_C_COMPILER gcc)
-set(CMAKE_CXX_COMPILER g++)
+set(CMAKE_C_COMPILER aarch64-elf-gcc)
+set(CMAKE_CXX_COMPILER aarch64-elf-g++)
 set(CMAKE_ASM_COMPILER ${CMAKE_C_COMPILER})
-set(CMAKE_LINKER ld)
+set(CMAKE_LINKER {aarch64-elf-ld})
 
 set(CMAKE_C_FLAGS "-march=armv8-a -ffreestanding -fno-pie -fno-builtin")
+set(CMAKE_CXX_FLAGS "-march=armv8-a -ffreestanding -fno-pie -fno-builtin")
 set(CMAKE_ASM_FLAGS "-march=armv8-a")
 
 set(CMAKE_C_LINK_EXECUTABLE "<CMAKE_C_COMPILER> <LINK_FLAGS> <OBJECTS> -o <TARGET>")
