@@ -1,6 +1,6 @@
 #include <stdint.h>
 #include <stdbool.h>
-#include "uart.h"
+#include <stdio.h>
 
 #define u8  uint8_t
 #define u32 uint32_t

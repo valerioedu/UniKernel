@@ -1,23 +1,42 @@
-#include "uart.h"
+#include <stdio.h>
 #include <stdarg.h>
+#include <stdbool.h>
 
-volatile char *uart = (char*)0x09000000;
+volatile char *uart = (volatile char*)0x09000000;
 
-void putc(const char c) {
+int putchar(int c) {
+    if (c > 127) {
+        return EOF;
+    }
+
     *uart = c;
+    return c;
 }
 
-int puts(const char *str) {
+int __puts(const char *str) {
     int ret = 0;
     while (*str != '\0') {
-        putc(*str++);
+        putchar(*str++);
         ret++;
     }
 
     return ret;
 }
 
-int printnum(int num) {
+int puts(const char *str) {
+    int ret = 0;
+    while (*str != '\0') {
+        putchar(*str++);
+        ret++;
+    }
+
+    putchar('\n');
+    ret++;
+
+    return ret;
+}
+
+int printd(int num) {
     int ret = 0;
     char buffer[12];
     int i = 0;
@@ -29,19 +48,39 @@ int printnum(int num) {
     }
     
     while (i > 0) {
-        putc(buffer[--i]);
+        putchar(buffer[--i]);
     }
 
     return ret;
 }
 
-int printlx(unsigned long num) {
+int printld(int num) {
+    int ret = 0;
+    char buffer[20];
+    int i = 0;
+    
+    while (num != 0) {
+        buffer[i++] = '0' + (num % 10);
+        num /= 10;
+        ret++;
+    }
+    
+    while (i > 0) {
+        putchar(buffer[--i]);
+    }
+
+    return ret;
+}
+
+int printlx(unsigned long num, bool uppercase) {
     char buf[32];
     int i = 0;
+
+    char a = uppercase ? 'A' : 'a';
     
     do {
         int digit = num % 16;
-        buf[i++] = digit < 10 ? '0' + digit : 'A' + digit - 10;
+        buf[i++] = digit < 10 ? '0' + digit : a + digit - 10;
         num /= 16;
     } while (num > 0 && i < 31);
     
@@ -53,17 +92,19 @@ int printlx(unsigned long num) {
         buf[k] = temp;
     }
     
-    puts(buf);
+    __puts(buf);
     return i - 1;
 }
 
-int printx(unsigned long num) {
+int printx(unsigned long num, bool uppercase) {
     char buf[16];
     int i = 0;
+
+    char a = uppercase ? 'A' : 'a';
     
     do {
         int digit = num % 16;
-        buf[i++] = digit < 10 ? '0' + digit : 'A' + digit - 10;
+        buf[i++] = digit < 10 ? '0' + digit : a + digit - 10;
         num /= 16;
     } while (num > 0 && i < 15);
     
@@ -75,11 +116,11 @@ int printx(unsigned long num) {
         buf[k] = temp;
     }
     
-    puts(buf);
+    __puts(buf);
     return i - 1;
 }
 
-int printf(const char *fmt, ...) {
+int printf(const char *restrict fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
 
@@ -91,35 +132,54 @@ int printf(const char *fmt, ...) {
                 switch (*(p + 2)) {
                     case 'x': {
                         unsigned long num = va_arg(ap, unsigned long);
-                        ret += printlx(num);
+                        ret += printlx(num, false);
                         p += 3;
                         break;
+                    }
+
+                    case 'X': {
+                        unsigned long num = va_arg(ap, unsigned long);
+                        ret += printlx(num, true);
+                        p += 3;
+                        break;
+                    }
+
+                    case 'd': {
+                        unsigned long num = va_arg(ap, unsigned long);
+                        ret += printld(num);
+                        p += 3;
                     }
                 }
             } else {
                 switch (*(p + 1)) {
                     case 'd': {
                         int num = va_arg(ap, int);
-                        ret += printnum(num);
+                        ret += printd(num);
                         p += 2;
                         break;
                     }
 
                     case 's': {
-                        ret += puts(va_arg(ap, char*));
+                        ret += __puts(va_arg(ap, char*));
                         p += 2;
                         break;
                     }
 
                     case 'x': {
                         int num = va_arg(ap, int);
-                        ret += printx(num);
+                        ret += printx(num, false);
+                        p += 2;
+                    }
+
+                    case 'X': {
+                        int num = va_arg(ap, int);
+                        ret += printx(num, true);
                         p += 2;
                     }
                 }
             }
         } else {
-            putc(*p++);
+            putchar(*p++);
             ret++;
         }
     }

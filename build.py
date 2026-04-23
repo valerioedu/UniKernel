@@ -25,7 +25,7 @@ def main():
 
     subprocess.run(["mmd", "-i", "disk.img", "::/EFI"], cwd=build_dir, text=True)
     subprocess.run(["mmd", "-i", "disk.img", "::/EFI/BOOT"], cwd=build_dir, text=True)
-    subprocess.run(["mcopy", "-i", "build/disk.img", "limine.conf", "::/EFI/BOOT/limine.conf"])
+    subprocess.run(["mcopy", "-i", "disk.img", "../limine.conf", "::/EFI/BOOT/limine.conf"], cwd=build_dir, text=True)
     subprocess.run(["mcopy", "-i", "disk.img", "BOOTAA64.EFI", "::/EFI/BOOT/BOOTAA64.EFI"], cwd=build_dir, text=True)
     subprocess.run(["mcopy", "-i", "disk.img", "kernel.bin", "::/"], cwd=build_dir, text=True)
 
@@ -48,4 +48,4 @@ if __name__ == "__main__":
                 ], cwd=Path("build"))
 
     except Exception as e:
-        print(f"An error occured: {e}")
+        print(f"An error occurred: {e}")
