@@ -5,11 +5,12 @@
 
 extern uint64_t _kernel_end;
 
+extern void heap_init(uintptr_t start, size_t size);
+extern void heap_debug();
+
 int main() {
     puts("Press Ctrl + A + X to exit\n");
-    int ret = printf("First print!\n");
-    printf("Returned: %d\n", ret);
-    printf("String and hex test: %s %X\n", "Passed!", 0xFFFF);
     pmm_init((uintptr_t)&_kernel_end, (uint64_t)2 * 1024 * 1024 * 1024);
     init_vmm();
+    heap_init(0x50000000, 8 * 1024 * 1024);
 }
