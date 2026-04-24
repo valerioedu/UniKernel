@@ -13,7 +13,8 @@ def main():
 
     build_dir.mkdir()
     subprocess.run(["cmake", ".."], cwd=build_dir, text=True)
-    subprocess.run(["make"], cwd=build_dir, text=True)
+    if subprocess.run(["make"], cwd=build_dir, text=True).returncode != 0:
+        exit(1)
 
     subprocess.run(["aarch64-elf-objcopy", "-O", "binary", "kernel.elf", "kernel.bin"], cwd=build_dir, text=True)
 

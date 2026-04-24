@@ -54,7 +54,7 @@ int printd(int num) {
     return ret;
 }
 
-int printld(int num) {
+int printld(long num) {
     int ret = 0;
     char buffer[20];
     int i = 0;
@@ -72,7 +72,7 @@ int printld(int num) {
     return ret;
 }
 
-int printlx(unsigned long num, bool uppercase) {
+int printlx(long num, bool uppercase) {
     char buf[32];
     int i = 0;
 
@@ -96,7 +96,7 @@ int printlx(unsigned long num, bool uppercase) {
     return i - 1;
 }
 
-int printx(unsigned long num, bool uppercase) {
+int printx(int num, bool uppercase) {
     char buf[16];
     int i = 0;
 
@@ -148,6 +148,7 @@ int printf(const char *restrict fmt, ...) {
                         unsigned long num = va_arg(ap, unsigned long);
                         ret += printld(num);
                         p += 3;
+                        break;
                     }
                 }
             } else {
@@ -169,12 +170,14 @@ int printf(const char *restrict fmt, ...) {
                         int num = va_arg(ap, int);
                         ret += printx(num, false);
                         p += 2;
+                        break;
                     }
 
                     case 'X': {
                         int num = va_arg(ap, int);
                         ret += printx(num, true);
                         p += 2;
+                        break;
                     }
                 }
             }
