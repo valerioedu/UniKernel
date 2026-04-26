@@ -16,7 +16,10 @@ def main():
     if subprocess.run(["make"], cwd=build_dir, text=True).returncode != 0:
         exit(1)
 
-    subprocess.run(["aarch64-elf-objcopy", "-O", "binary", "kernel.elf", "kernel.bin"], cwd=build_dir, text=True)
+    is_test = "--test" in sys.argv
+    target_elf = "kernel_tests.elf" if is_test else "kernel.elf"
+
+    subprocess.run(["aarch64-elf-objcopy", "-O", "binary", target_elf, "kernel.bin"], cwd=build_dir, text=True)
 
     subprocess.run(["dd", "if=/dev/zero", "of=disk.img", "bs=1M", "count=128", "status=none"], cwd=build_dir, text=True)
 

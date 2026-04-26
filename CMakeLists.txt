@@ -42,3 +42,11 @@ set_target_properties(kernel.elf PROPERTIES
     LINK_FLAGS "-T ${LINKER_SCRIPT} -nostdlib"
     LINK_DEPENDS ${LINKER_SCRIPT}
 )
+
+add_executable(kernel_tests.elf ${KERNEL_SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/test/unit_test.c)
+target_compile_definitions(kernel_tests.elf PRIVATE MAX_CPUS=2)
+target_compile_definitions(kernel_tests.elf PRIVATE UNIT_TEST)
+set_target_properties(kernel_tests.elf PROPERTIES
+    LINK_FLAGS "-T ${LINKER_SCRIPT} -nostdlib"
+    LINK_DEPENDS ${LINKER_SCRIPT}
+)
