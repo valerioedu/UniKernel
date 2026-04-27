@@ -47,7 +47,7 @@ void el1_sync_handler() {
             // Extract Write flag (Bit 6 of ISS for Data Aborts)
             bool is_write = (iss >> 6) & 1; 
 
-            printf("\n[ [RPANIC [W] UNHANDLED SYNC EXCEPTION\n");
+            printf("\n[PANIC] UNHANDLED SYNC EXCEPTION\n");
             printf("  Type: %s Abort\n", (ec & 0x1) ? "Data" : "Instruction");
             printf("  ESR: 0x%lx (FSC: 0x%x, Write: %d)\n", esr, fsc, is_write);
             printf("  FAR: 0x%lx\n", far);
@@ -59,7 +59,7 @@ void el1_sync_handler() {
             break;
 
         default:
-            printf("\n[ [RPANIC [W] SYNC EXCEPTION\n");
+            printf("\n[PANIC] SYNC EXCEPTION\n");
             printf("  ESR: 0x%lx (EC: 0x%x)\n", esr, ec);
             printf("  ELR: 0x%lx (PC)\n", elr);
             printf("  FAR: 0x%lx (Addr)\n", far);

@@ -10,7 +10,7 @@ set(CMAKE_OSX_ARCHITECTURES "")
 project(valerioedx ASM C CXX)
 
 set(ARCH "AArch64")
-        
+
 set(CMAKE_C_COMPILER aarch64-elf-gcc)
 set(CMAKE_CXX_COMPILER aarch64-elf-g++)
 set(CMAKE_ASM_COMPILER ${CMAKE_C_COMPILER})
@@ -34,19 +34,23 @@ file(GLOB_RECURSE KERNEL_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp
 )
 
-add_executable(kernel.elf ${KERNEL_SOURCES})
+option(BUILD_TESTS "Build the kernel tests" OFF)
 
-target_compile_definitions(kernel.elf PRIVATE MAX_CPUS=2)
+if(BUILD_TESTS)
+    add_executable(kernel_tests.elf ${KERNEL_SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/test/unit_test.c)
+    target_compile_definitions(kernel_tests.elf PRIVATE MAX_CPUS=2)
+    target_compile_definitions(kernel_tests.elf PRIVATE UNIT_TEST)
+    set_target_properties(kernel_tests.elf PROPERTIES
+        LINK_FLAGS "-T ${LINKER_SCRIPT} -nostdlib"
+        LINK_DEPENDS ${LINKER_SCRIPT}
+    )
+else()
+    add_executable(kernel.elf ${KERNEL_SOURCES})
 
-set_target_properties(kernel.elf PROPERTIES
-    LINK_FLAGS "-T ${LINKER_SCRIPT} -nostdlib"
-    LINK_DEPENDS ${LINKER_SCRIPT}
-)
+    target_compile_definitions(kernel.elf PRIVATE MAX_CPUS=2)
 
-add_executable(kernel_tests.elf ${KERNEL_SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/test/unit_test.c)
-target_compile_definitions(kernel_tests.elf PRIVATE MAX_CPUS=2)
-target_compile_definitions(kernel_tests.elf PRIVATE UNIT_TEST)
-set_target_properties(kernel_tests.elf PROPERTIES
-    LINK_FLAGS "-T ${LINKER_SCRIPT} -nostdlib"
-    LINK_DEPENDS ${LINKER_SCRIPT}
-)
+    set_target_properties(kernel.elf PROPERTIES
+        LINK_FLAGS "-T ${LINKER_SCRIPT} -nostdlib"
+        LINK_DEPENDS ${LINKER_SCRIPT}
+    )
+endif()

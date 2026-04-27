@@ -37,6 +37,11 @@ int puts(const char *str) {
 }
 
 int printd(int num) {
+    if (num == 0) {
+        putchar('0');
+        return 1;
+    }
+
     int ret = 0;
     char buffer[12];
     int i = 0;
@@ -55,6 +60,11 @@ int printd(int num) {
 }
 
 int printld(long num) {
+    if (num == 0) {
+        putchar('0');
+        return 1;
+    }
+    
     int ret = 0;
     char buffer[20];
     int i = 0;

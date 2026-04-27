@@ -12,12 +12,17 @@ def main():
         shutil.rmtree(build_dir)
 
     build_dir.mkdir()
-    subprocess.run(["cmake", ".."], cwd=build_dir, text=True)
-    if subprocess.run(["make"], cwd=build_dir, text=True).returncode != 0:
-        exit(1)
 
     is_test = "--test" in sys.argv
     target_elf = "kernel_tests.elf" if is_test else "kernel.elf"
+
+    cmake_args = ["cmake", ".."]
+    if is_test:
+        cmake_args.append("-DBUILD_TESTS=ON")
+
+    subprocess.run(cmake_args, cwd=build_dir, text=True)
+    if subprocess.run(["make"], cwd=build_dir, text=True).returncode != 0:
+        exit(1)
 
     subprocess.run(["aarch64-elf-objcopy", "-O", "binary", target_elf, "kernel.bin"], cwd=build_dir, text=True)
 
