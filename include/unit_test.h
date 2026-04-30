@@ -4,6 +4,8 @@
 typedef enum unitTestScenario {
     HEAP_STRESS = 0,
     HEAP_FRAGMENT,
+    SCHED_BENCHMARK,
+    SCHED_YIELD,
 } unitTestScenario;
 
 [[__noreturn__]]void unitTestBegin(unitTestScenario scenario);

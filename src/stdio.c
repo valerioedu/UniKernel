@@ -1,6 +1,10 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#include <pthread.h>
+
+extern bool mmu_enabled;
+static pthread_spinlock_t print_lock = 0;
 
 volatile char *uart = (volatile char*)0x09000000;
 
@@ -64,7 +68,30 @@ int printld(long num) {
         putchar('0');
         return 1;
     }
+
+    int ret = 0;
+    char buffer[20];
+    int i = 0;
     
+    while (num != 0) {
+        buffer[i++] = '0' + (num % 10);
+        num /= 10;
+        ret++;
+    }
+    
+    while (i > 0) {
+        putchar(buffer[--i]);
+    }
+
+    return ret;
+}
+
+int printlu(unsigned long num) {
+    if (num == 0) {
+        putchar('0');
+        return 1;
+    }
+
     int ret = 0;
     char buffer[20];
     int i = 0;
@@ -83,7 +110,7 @@ int printld(long num) {
 }
 
 int printlx(long num, bool uppercase) {
-    char buf[32];
+    char buf[20];
     int i = 0;
 
     char a = uppercase ? 'A' : 'a';
@@ -134,6 +161,7 @@ int printf(const char *restrict fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
 
+    if (mmu_enabled) pthread_spin_lock(&print_lock);
     int ret = 0;
     const char *p = fmt;
     while (*p != '\0') {
@@ -155,8 +183,15 @@ int printf(const char *restrict fmt, ...) {
                     }
 
                     case 'd': {
-                        unsigned long num = va_arg(ap, unsigned long);
+                        long num = va_arg(ap, long);
                         ret += printld(num);
+                        p += 3;
+                        break;
+                    }
+
+                    case 'u': {
+                        unsigned long num = va_arg(ap, unsigned long);
+                        ret += printlu(num);
                         p += 3;
                         break;
                     }
@@ -197,6 +232,7 @@ int printf(const char *restrict fmt, ...) {
         }
     }
 
+    if (mmu_enabled) pthread_spin_unlock(&print_lock);
     va_end(ap);
     return ret;
 }

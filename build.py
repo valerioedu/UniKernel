@@ -47,13 +47,14 @@ if __name__ == "__main__":
                     "qemu-system-aarch64", 
                     "-M", "virt", 
                     "-m", "2G", 
-                    "-cpu", "cortex-a710", 
+                    "-cpu", "host", 
                     "-bios", bios, 
                     "-nographic", 
                     "-drive", "file=disk.img,if=virtio,format=raw",
                     "-smp", "cores=2", 
                     "-netdev", "user,id=net0",
-                    "-device", "virtio-net-device,netdev=net0"
+                    "-device", "virtio-net-device,netdev=net0",
+                    "-accel", "hvf"
                 ], cwd=Path("build"))
 
     except Exception as e:

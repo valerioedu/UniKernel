@@ -345,7 +345,6 @@ static void rotate_queue(task_priority priority) {
 int sched_yield() {
     pthread_spin_lock(&sched_lock);
 
-    // Round Robin
     task_t* prev_task = current_task;
     task_t* next_task = NULL;
 
@@ -476,4 +475,24 @@ int pthread_attr_getschedparam(const pthread_attr_t *restrict attr, int *restric
     if (!attr || !attr->is_initialized || !param) return EINVAL;
     *param = attr->schedparam;
     return 0;
+}
+
+void sched_init_secondary(int cpu_id) {
+    if (cpu_id < 0 || cpu_id >= MAX_CPUS) return;
+
+    cores[cpu_id].cpu_id = cpu_id;
+    cores[cpu_id].task = NULL;
+
+    cpu_core_t* local_core = &cores[cpu_id];
+    asm volatile("msr tpidr_el1, %0" :: "r"(local_core));
+
+    task_t* main_task = (task_t*)malloc(sizeof(task_t));
+    memset(main_task, 0, sizeof(task_t));
+    
+    main_task->id = tid_counter++;
+    main_task->state = TASK_RUNNING;
+    main_task->priority = IDLE;
+    
+    current_task = main_task;
+}
 }

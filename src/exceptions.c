@@ -20,7 +20,7 @@ void dump_stack() {
         uint64_t lr = *(uint64_t*)(fp + 8);
         uint64_t prev_fp = *(uint64_t*)fp;
 
-        printf("[%d] PC: 0x%lx\n", depth, lr);
+        printf("[%d] PC: 0x%lx\n", depth, lr - 0xba400000 + 0x40100000);
 
         fp = prev_fp;
         depth++;
