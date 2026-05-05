@@ -32,7 +32,7 @@ uint64_t boot_time = 0;
 bool mmu_enabled = false;
 
 //Entry points need to be a boot function similar to boot.S
-int psci_cpu_on(uint64_t target_cpu, uint64_t entry_point, uint64_t context_id) {
+static int psci_cpu_on(uint64_t target_cpu, uint64_t entry_point, uint64_t context_id) {
     register uint64_t x0 asm("x0") = PSCI_CPU_ON_64;
     register uint64_t x1 asm("x1") = target_cpu;
     register uint64_t x2 asm("x2") = entry_point;
@@ -42,7 +42,7 @@ int psci_cpu_on(uint64_t target_cpu, uint64_t entry_point, uint64_t context_id) 
     return x0;
 }
 
-void core_entry() {
+static void core_entry() {
     printf("[SMP] Core 1 online!\n");
     sched_init_secondary(1);
     sched_yield();
