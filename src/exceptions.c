@@ -6,7 +6,20 @@
 #define u32 uint32_t
 #define u64 uint64_t
 
-void dump_stack() {
+typedef struct {
+    uint64_t x[31];     // X0 - X30 (Offset 0 - 240)
+    uint64_t _padding;  // Padding at offset 248 
+    uint64_t sp_el0;    // Offset 256
+    uint64_t elr_el1;   // Offset 264 (The PC)
+    uint64_t spsr_el1;  // Offset 272 (The CPSR)
+    uint64_t _padding2; // Padding at offset 280
+    __uint128_t q[32];  // Q0 - Q31 (Offset 288 - 799)
+    uint32_t fpsr;      // Offset 800
+    uint32_t fpcr;      // Offset 804
+    uint64_t _padding3; // Padding for 16-byte stack alignment
+} trapframe_t;
+
+static void dump_stack() {
     uint64_t fp;
     
     asm volatile("mov %0, x29" : "=r"(fp));
@@ -28,7 +41,7 @@ void dump_stack() {
     printf("-------------------\n");
 }
 
-void el1_sync_handler() {
+void el1_sync_handler(trapframe_t *frame) {
     u64 esr, elr, far;
     asm volatile("mrs %0, esr_el1" : "=r"(esr));
     asm volatile("mrs %0, elr_el1" : "=r"(elr));
@@ -56,7 +69,7 @@ void el1_sync_handler() {
             break;
 
         case 0x3C:      // brk instruction
-            break;
+            return;
 
         default:
             printf("\n[PANIC] SYNC EXCEPTION\n");
