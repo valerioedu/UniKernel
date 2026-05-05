@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stddef.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <pthread.h>
@@ -15,6 +16,32 @@ int putchar(int c) {
 
     *uart = c;
     return c;
+}
+
+int getchar(void) {
+    volatile unsigned int *uart_fr = (volatile unsigned int*)(uart + 0x18);
+
+    while (*uart_fr & (1 << 4)) {
+        asm volatile("yield" ::: "memory");
+    }
+
+    return *uart & 0xFF;
+}
+
+char *gets(char *str) {
+    char c;
+    unsigned i;
+    while (c = (char)getchar() != '\n') {
+        str[i++] = c;
+    }
+
+    if (i = 0) {
+        return NULL;
+    } else {
+        str[i++] = '\0';
+    }
+
+    return str;
 }
 
 int __puts(const char *str) {

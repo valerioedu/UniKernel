@@ -11,6 +11,8 @@
 extern "C" {
 #endif
 int putchar(int c);
+int getchar(void);
+char *gets(char *str);
 int puts(const char *str);
 int printf(const char *restrict fmt, ...);
 #ifdef __cplusplus
