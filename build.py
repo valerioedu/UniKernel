@@ -14,11 +14,15 @@ def main():
     build_dir.mkdir()
 
     is_test = "--test" in sys.argv
+    is_debug_stub = "--debug-stub" in sys.argv
+    
     target_elf = "kernel_tests.elf" if is_test else "kernel.elf"
 
     cmake_args = ["cmake", ".."]
     if is_test:
         cmake_args.append("-DBUILD_TESTS=ON")
+    if is_debug_stub:
+        cmake_args.append("-DENABLE_DEBUG_STUB=ON")
 
     subprocess.run(cmake_args, cwd=build_dir, text=True)
     if subprocess.run(["make"], cwd=build_dir, text=True).returncode != 0:
@@ -41,21 +45,41 @@ def main():
 if __name__ == "__main__":
     try:
         main()
+        
+        run_qemu = False
+        debug_stub = False
+        
         for arg in sys.argv:
             if arg == "--run":
-                subprocess.run([
-                    "qemu-system-aarch64", 
-                    "-M", "virt", 
-                    "-m", "2G", 
-                    "-cpu", "host", 
-                    "-bios", bios, 
-                    "-nographic", 
-                    "-drive", "file=disk.img,if=virtio,format=raw",
-                    "-smp", "cores=2", 
-                    "-netdev", "user,id=net0",
-                    "-device", "virtio-net-device,netdev=net0",
-                    "-accel", "hvf"
-                ], cwd=Path("build"))
+                run_qemu = True
+            elif arg == "--debug-stub":
+                debug_stub = True
+
+        if run_qemu:
+            qemu_cmd = [
+                "qemu-system-aarch64", 
+                "-M", "virt", 
+                "-m", "2G", 
+                "-cpu", "host", 
+                "-bios", bios, 
+                "-drive", "file=disk.img,if=virtio,format=raw",
+                "-smp", "cores=2", 
+                "-netdev", "user,id=net0",
+                "-device", "virtio-net-device,netdev=net0",
+                "-accel", "hvf"
+            ]
+            
+            if debug_stub:
+                qemu_cmd.extend([
+                    "-display", "none",                      
+                    "-serial", "mon:stdio",                
+                    "-s", "-S"
+                ])
+                print("Starting QEMU. Hypervisor GDB server on localhost:1234...")
+            else:
+                qemu_cmd.append("-nographic")
+
+            subprocess.run(qemu_cmd, cwd=Path("build"))
 
     except Exception as e:
         print(f"An error occurred: {e}")

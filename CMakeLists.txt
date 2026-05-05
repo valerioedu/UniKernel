@@ -16,9 +16,19 @@ set(CMAKE_CXX_COMPILER aarch64-elf-g++)
 set(CMAKE_ASM_COMPILER ${CMAKE_C_COMPILER})
 set(CMAKE_LINKER aarch64-elf-ld)
 
-set(CMAKE_C_FLAGS "-march=armv8-a -ffreestanding -fno-pie -fno-builtin -mno-outline-atomics")
-set(CMAKE_CXX_FLAGS "-march=armv8-a -ffreestanding -fno-pie -fno-builtin -mno-outline-atomics")
-set(CMAKE_ASM_FLAGS "-march=armv8-a")
+option(ENABLE_DEBUG_STUB "Enable debug symbols for GDB stub" OFF)
+
+set(COMMON_FLAGS "-march=armv8-a -ffreestanding -fno-pie -fno-builtin -mno-outline-atomics")
+
+if(ENABLE_DEBUG_STUB)
+    set(CMAKE_C_FLAGS "-g3 ${COMMON_FLAGS}")
+    set(CMAKE_CXX_FLAGS "-g3 ${COMMON_FLAGS}")
+    set(CMAKE_ASM_FLAGS "-g3 -march=armv8-a")
+else()
+    set(CMAKE_C_FLAGS "${COMMON_FLAGS}")
+    set(CMAKE_CXX_FLAGS "${COMMON_FLAGS}")
+    set(CMAKE_ASM_FLAGS "-march=armv8-a")
+endif()
 
 set(CMAKE_C_LINK_EXECUTABLE "<CMAKE_C_COMPILER> <LINK_FLAGS> <OBJECTS> -o <TARGET>")
 
@@ -44,10 +54,16 @@ if(BUILD_TESTS)
         LINK_FLAGS "-T ${LINKER_SCRIPT} -nostdlib"
         LINK_DEPENDS ${LINKER_SCRIPT}
     )
+    if(ENABLE_DEBUG_STUB)
+        target_compile_definitions(kernel_tests.elf PRIVATE ENABLE_DEBUG_STUB)
+    endif()
 else()
     add_executable(kernel.elf ${KERNEL_SOURCES})
 
     target_compile_definitions(kernel.elf PRIVATE MAX_CPUS=2)
+    if(ENABLE_DEBUG_STUB)
+        target_compile_definitions(kernel.elf PRIVATE ENABLE_DEBUG_STUB)
+    endif()
 
     set_target_properties(kernel.elf PROPERTIES
         LINK_FLAGS "-T ${LINKER_SCRIPT} -nostdlib"
