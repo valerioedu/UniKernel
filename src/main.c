@@ -45,8 +45,9 @@ static int psci_cpu_on(uint64_t target_cpu, uint64_t entry_point, uint64_t conte
 static void core_entry() {
     printf("[SMP] Core 1 online!\n");
     sched_init_secondary(1);
-    sched_yield();
-    while(1);
+    while(1) {
+        sched_yield();
+    }
 }
 
 int main() {
@@ -68,7 +69,7 @@ int main() {
     boot_data->entry_point = (uint64_t)core_entry;
     psci_cpu_on(1, (uint64_t)secondary_entry, (uint64_t)boot_data);
 #ifdef UNIT_TEST
-    unitTestBegin(SCHED_YIELD);
+    unitTestBegin(SCHED_BENCHMARK);
 #endif
     sched_yield();
     pthread_exit(NULL);

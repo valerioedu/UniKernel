@@ -1,4 +1,5 @@
 #include <sched.h>
+#include <stdatomic.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -11,8 +12,6 @@
 #endif
 
 #define current_task (get_core()->task)
-
-//TODO: be POSIX pthread.h compatible
 
 struct cpu_context {
     uint64_t x19;
@@ -62,13 +61,10 @@ typedef enum task_state {
 typedef struct task {
     struct cpu_context context; // Must be at offset 0 for easier assembly
     uint64_t id;
-    uint64_t wake_tick;
     task_state state;
     task_priority priority;
     struct task* next;          // Linked list pointer
     struct task *prev;
-    struct task* next_wait;     // Pointer to wait queue
-    struct task *sleep_next;
     void* stack_page;           // Pointer to the allocated stack memory
     void *ret_value;
     struct task *join_wait_queue;
@@ -77,12 +73,22 @@ typedef struct task {
 typedef struct {
     uint32_t cpu_id;
     task_t *task;
+    task_t *task_to_free;
 } cpu_core_t;
 
 static inline cpu_core_t* get_core() {
     cpu_core_t* core;
     asm volatile("mrs %0, tpidr_el1" : "=r"(core));
     return core;
+}
+
+int sched_getcpu(void) {
+    cpu_core_t* core = get_core();
+    if (core) {
+        return core->cpu_id;
+    }
+    
+    return -1;
 }
 
 extern void cpu_switch_to(struct task* prev, struct task* next);
@@ -104,7 +110,7 @@ static uint64_t kernel_ttbr1 = 0;
 static uint64_t idle_flag;
 
 int pthread_spin_init(pthread_spinlock_t *lock, int pshared) {
-    __atomic_store_n(lock, 0, __ATOMIC_RELAXED);
+    atomic_store(lock, 0);
     return 0;
 }
 
@@ -112,11 +118,11 @@ int pthread_spin_lock(pthread_spinlock_t *lock) {
     while (1) {
         pthread_spinlock_t expected = 0;
         
-        if (__atomic_compare_exchange_n(lock, &expected, 1, true, __ATOMIC_ACQUIRE, __ATOMIC_ACQUIRE)) {
+        if (atomic_compare_exchange_weak(lock, &expected, 1)) {
             return 0; 
         }
 
-        while (__atomic_load_n(lock, __ATOMIC_RELAXED) == 1) {
+        while (atomic_load_explicit(lock, memory_order_relaxed) == 1) {
             asm volatile("yield" ::: "memory");
         }
     }
@@ -124,7 +130,7 @@ int pthread_spin_lock(pthread_spinlock_t *lock) {
 
 int pthread_spin_trylock(pthread_spinlock_t *lock) {
     pthread_spinlock_t expected = 0;
-    if (!__atomic_compare_exchange_n(lock, &expected, 1, false, __ATOMIC_ACQUIRE, __ATOMIC_ACQUIRE)) {
+    if (!atomic_compare_exchange_strong(lock, &expected, 1)) {
         return EBUSY;
     }
 
@@ -132,13 +138,13 @@ int pthread_spin_trylock(pthread_spinlock_t *lock) {
 }
 
 int pthread_spin_unlock(pthread_spinlock_t *lock) {
-    __atomic_store_n(lock, 0, __ATOMIC_RELEASE);
+    atomic_store_explicit(lock, 0, memory_order_release);
     return 0;
 }
 
 int pthread_spin_destroy(pthread_spinlock_t *lock) {
     pthread_spinlock_t expected = 0;
-    if (__atomic_load_n(lock, __ATOMIC_ACQUIRE) != 0) {
+    if (atomic_load(lock) != 0) {
         return EBUSY;
     }
 
@@ -217,7 +223,10 @@ void sched_init() {
 
     // Store the kernel's TTBR1 value
     asm volatile("mrs %0, ttbr1_el1" : "=r"(kernel_ttbr1));
-    pthread_create(NULL, NULL, idle, &idle_flag);
+    
+    pthread_t idle_thread;
+    pthread_create(&idle_thread, NULL, idle, &idle_flag);
+    cores[0].task = (task_t*)idle_thread;
     
     task_t* main_task = (task_t*)malloc(sizeof(task_t));
     memset(main_task, 0, sizeof(task_t));
@@ -229,7 +238,6 @@ void sched_init() {
     main_task->priority = NORMAL;
     
     current_task = main_task;
-    sched_enqueue_task(main_task);
 
     printf("[SCHED] Multi-Queue Scheduler Initialized (%d Levels).\n", COUNT);
 }
@@ -268,7 +276,6 @@ int pthread_create(pthread_t *restrict thread, const pthread_attr_t *restrict at
     
     t->next = NULL;
     t->prev = NULL;
-    t->next_wait = NULL;
 
     uint64_t stack_size = 4096 * 4;       
     if (attr && attr->is_initialized) {
@@ -292,10 +299,11 @@ int pthread_create(pthread_t *restrict thread, const pthread_attr_t *restrict at
     t->context.x20 = (uint64_t)arg;
     t->context.x19 = (uint64_t)start_routine;
 
-    pthread_spin_lock(&sched_lock);
-    sched_enqueue_task(t);
-
-    pthread_spin_unlock(&sched_lock);
+    if (t->priority != IDLE) {
+        pthread_spin_lock(&sched_lock);
+        sched_enqueue_task(t);
+        pthread_spin_unlock(&sched_lock);
+    }
 
     if (thread) {
         *thread = (void*)t;
@@ -310,26 +318,18 @@ int pthread_create(pthread_t *restrict thread, const pthread_attr_t *restrict at
     
     current_task->ret_value = value_ptr;
     current_task->state = TASK_EXITED;
-    
+    cores[sched_getcpu()].task_to_free = current_task;
+
     task_t* waiting = current_task->join_wait_queue;
     while (waiting) {
-        task_t* next = waiting->next_wait;
-        
         waiting->state = TASK_READY;
         sched_enqueue_task(waiting);
-        
-        waiting->next_wait = NULL;
-        waiting = next;
     }
 
     current_task->join_wait_queue = NULL;
-    task_t *t = current_task;
 
     sched_dequeue_task(current_task);
     pthread_spin_unlock(&sched_lock);
-    
-    free(t);
-    free(t->stack_page);
     sched_yield();
     while(1); 
 }
@@ -343,35 +343,43 @@ static void rotate_queue(task_priority priority) {
 }
 
 int sched_yield() {
+    task_t *dead_task = cores[sched_getcpu()].task_to_free;
+    if (dead_task) {
+        cores[sched_getcpu()].task_to_free = NULL;
+        free(dead_task->stack_page);
+        free(dead_task);
+    }
+    
     pthread_spin_lock(&sched_lock);
 
     task_t* prev_task = current_task;
+    
+    if (prev_task && prev_task->state == TASK_RUNNING && prev_task->priority != IDLE) {
+        prev_task->state = TASK_READY;
+        sched_enqueue_task(prev_task);
+    }
+    
     task_t* next_task = NULL;
 
-    if (prev_task && prev_task->state == TASK_RUNNING)
-        rotate_queue(prev_task->priority);
-
-
-    if (active_priorities == 0)
-        next_task = runqueues[IDLE];
-    
-    else {
+    if (active_priorities > 0) {
         int highest_prio = 31 - __builtin_clz(active_priorities);
         if (highest_prio >= COUNT) highest_prio = COUNT - 1;
         next_task = runqueues[highest_prio];
     }
 
     if (!next_task) {
-        next_task = runqueues[IDLE];
+        next_task = cores[sched_getcpu()].task;
+    }
+
+    if (next_task && next_task->priority != IDLE) {
+        sched_dequeue_task(next_task);
+        next_task->state = TASK_RUNNING;
+    } else if (next_task) {
+        next_task->state = TASK_RUNNING;
     }
 
     if (next_task != prev_task) {
         current_task = next_task;
-
-        if (current_task->state == TASK_READY) {
-            current_task->state = TASK_RUNNING;
-        }
-
         cpu_switch_to(prev_task, next_task);
     }
 
@@ -481,18 +489,19 @@ void sched_init_secondary(int cpu_id) {
     if (cpu_id < 0 || cpu_id >= MAX_CPUS) return;
 
     cores[cpu_id].cpu_id = cpu_id;
-    cores[cpu_id].task = NULL;
 
     cpu_core_t* local_core = &cores[cpu_id];
     asm volatile("msr tpidr_el1, %0" :: "r"(local_core));
-
-    task_t* main_task = (task_t*)malloc(sizeof(task_t));
-    memset(main_task, 0, sizeof(task_t));
     
-    main_task->id = tid_counter++;
-    main_task->state = TASK_RUNNING;
-    main_task->priority = IDLE;
+    task_t *idle_core2;
+    pthread_create((pthread_t*)&idle_core2, NULL, idle, &idle_flag);
+    idle_core2->priority = IDLE;
     
-    current_task = main_task;
-}
+    cores[cpu_id].task = idle_core2;
+    
+    task_t* startup_task = (task_t*)malloc(sizeof(task_t));
+    memset(startup_task, 0, sizeof(task_t));
+    startup_task->priority = IDLE;
+    startup_task->state = TASK_RUNNING;
+    current_task = startup_task;
 }
