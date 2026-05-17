@@ -204,6 +204,9 @@ void init_vmm() {
     // UART map (Identity)
     vmm_map_region(0x09000000, 0x09000000, 1024 * 1024, VM_WRITABLE | VM_DEVICE);
 
+    // Virtio MMIO map (Identity)
+    vmm_map_region(0x0a000000, 0x0a000000, 1024 * 1024, VM_WRITABLE | VM_DEVICE);
+
     // Activates Paging
     write_ttbr0(root_phys);
     write_ttbr1(root_phys); 

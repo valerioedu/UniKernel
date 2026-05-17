@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include "pmm.h"
 #include "vmm.h"
+#include "net.h"
 
 #ifdef UNIT_TEST
 #include "unit_test.h"
@@ -68,6 +69,7 @@ int main() {
     
     boot_data->entry_point = (uint64_t)core_entry;
     psci_cpu_on(1, (uint64_t)secondary_entry, (uint64_t)boot_data);
+    net_init();
 #ifdef UNIT_TEST
     unitTestBegin(SCHED_BENCHMARK);
 #endif

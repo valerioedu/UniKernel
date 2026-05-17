@@ -1,0 +1,29 @@
+#ifndef NET_H
+#define NET_H
+
+#include <stdint.h>
+
+#define VIRTIO_NET_BASE       0x0a003e00
+
+#define VIRTIO_REG_MAGIC      0x000
+#define VIRTIO_REG_VERSION    0x004
+#define VIRTIO_REG_DEVICEID   0x008
+#define VIRTIO_REG_DEV_FEAT   0x010
+#define VIRTIO_REG_DRV_FEAT   0x020
+#define VIRTIO_REG_QUEUE_SEL  0x030
+#define VIRTIO_REG_QUEUE_MAX  0x034
+#define VIRTIO_REG_QUEUE_NUM  0x038
+#define VIRTIO_REG_QUEUE_RDY  0x044
+#define VIRTIO_REG_QUEUE_NOTI 0x050
+#define VIRTIO_REG_STATUS     0x070
+
+#define VIRTIO_REG_Q_DESC_LOW    0x080
+#define VIRTIO_REG_Q_DESC_HIGH   0x084
+#define VIRTIO_REG_Q_AVAIL_LOW   0x090
+#define VIRTIO_REG_Q_AVAIL_HIGH  0x094
+#define VIRTIO_REG_Q_USED_LOW    0x0A0
+#define VIRTIO_REG_Q_USED_HIGH   0x0A4
+
+void net_init();
+
+#endif
