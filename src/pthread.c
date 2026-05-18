@@ -98,10 +98,9 @@ int pthread_create(pthread_t *restrict thread, const pthread_attr_t *restrict at
 
 static task_t *runqueues[COUNT];
 static task_t *runqueues_tail[COUNT];
-static task_t *sleep_queue = NULL;
 static cpu_core_t cores[MAX_CPUS];
 
-static uint64_t tid_counter = 0;
+static _Atomic uint64_t tid_counter = 0;
 
 static pthread_spinlock_t sched_lock;
 static uint32_t active_priorities = 0;
@@ -264,7 +263,7 @@ int pthread_create(pthread_t *restrict thread, const pthread_attr_t *restrict at
         return EAGAIN;
     }
 
-    t->id = tid_counter++;
+    t->id = atomic_fetch_add(&tid_counter, 1);
     t->state = TASK_READY;
     if (arg == &idle_flag) {
         t->priority = IDLE;
@@ -294,7 +293,7 @@ int pthread_create(pthread_t *restrict thread, const pthread_attr_t *restrict at
         return EAGAIN;
     }
 
-    t->context.sp = (uint64_t)t->stack_page + stack_size;
+    t->context.sp = ((uint64_t)t->stack_page + stack_size) & ~0xF;
     t->context.lr  = (uint64_t)ret_from_fork;
     t->context.x20 = (uint64_t)arg;
     t->context.x19 = (uint64_t)start_routine;
@@ -332,6 +331,35 @@ int pthread_create(pthread_t *restrict thread, const pthread_attr_t *restrict at
     pthread_spin_unlock(&sched_lock);
     sched_yield();
     while(1); 
+}
+
+int pthread_join(pthread_t thread, void **value_ptr) {
+    if (!thread) {
+        return EINVAL;
+    }
+
+    task_t *t = (task_t*)thread;
+    
+    pthread_spin_lock(&sched_lock);
+
+    if (t->state != TASK_EXITED) {
+        current_task->state = TASK_BLOCKED;
+        current_task->next = t->join_wait_queue;
+        t->join_wait_queue = current_task;
+        
+        pthread_spin_unlock(&sched_lock);
+        while (t->state != TASK_EXITED) {
+            sched_yield(); 
+        }
+    } else {
+        pthread_spin_unlock(&sched_lock);
+    }
+
+    if (value_ptr) {
+        *value_ptr = t->ret_value;
+    }
+
+    return 0;
 }
 
 static void rotate_queue(task_priority priority) {
