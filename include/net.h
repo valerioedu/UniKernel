@@ -24,6 +24,9 @@
 #define VIRTIO_REG_Q_USED_LOW    0x0A0
 #define VIRTIO_REG_Q_USED_HIGH   0x0A4
 
+#define VIRTIO_RX_QSIZE 256
+
 void net_init();
+void arp_request_gateway();
 
 #endif

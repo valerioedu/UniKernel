@@ -19,6 +19,10 @@ typedef struct {
     uint64_t _padding3; // Padding for 16-byte stack alignment
 } trapframe_t;
 
+extern uint64_t gic_aoi();
+extern void gic_eoi(uint64_t id);
+extern void virtio_net_handle_irq();
+
 static void dump_stack() {
     uint64_t fp;
     
@@ -85,7 +89,18 @@ void el1_sync_handler(trapframe_t *frame) {
 }
 
 void el1_irq_handler() {
+    uint32_t irq_id = gic_aoi();
+    
+    switch (irq_id) {
+    case 48:
+        virtio_net_handle_irq();
+        break;
+    
+    default:
+        break;
+    }
 
+    gic_eoi(irq_id);
 }
 
 void el1_fiq_handler() {

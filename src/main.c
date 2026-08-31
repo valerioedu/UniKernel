@@ -26,7 +26,9 @@ extern uint64_t _kernel_end;
 extern void heap_init(uintptr_t start, size_t size);
 extern void heap_debug();
 extern void sched_init();
+extern void gic_enable_irq(uint64_t id);
 extern void secondary_entry();
+extern void gic_init();
 void sched_init_secondary(int cpu_id); 
 
 uint64_t boot_time = 0;
@@ -55,9 +57,11 @@ int main() {
     puts("Press Ctrl + A + X to exit\n");
     pmm_init((uintptr_t)&_kernel_end, (uint64_t)2 * 1024 * 1024 * 1024);
     init_vmm();
+    gic_init();
     mmu_enabled = true;
     heap_init(0x50000000, 8 * 1024 * 1024);
     sched_init();
+    gic_enable_irq(48);
 
     struct secondary_boot_data* boot_data = malloc(sizeof(struct secondary_boot_data));
     void* core1_stack = malloc(4096 * 4);

@@ -207,6 +207,9 @@ void init_vmm() {
     // Virtio MMIO map (Identity)
     vmm_map_region(0x0a000000, 0x0a000000, 1024 * 1024, VM_WRITABLE | VM_DEVICE);
 
+    // GIC map (Identity)
+    vmm_map_region(0x08000000, 0x08000000, 1024 * 1024, VM_WRITABLE | VM_DEVICE);
+
     // Activates Paging
     write_ttbr0(root_phys);
     write_ttbr1(root_phys); 
