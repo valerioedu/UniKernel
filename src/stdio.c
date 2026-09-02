@@ -2,10 +2,12 @@
 #include <stddef.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#include <stdlib.h>
 #include <pthread.h>
 
 extern bool mmu_enabled;
 static pthread_spinlock_t print_lock = 0;
+static pthread_spinlock_t read_lock = 0;
 
 volatile char *uart = (volatile char*)0x09000000;
 
@@ -14,7 +16,12 @@ int putchar(int c) {
         return EOF;
     }
 
-    *uart = c;
+    volatile unsigned int *uart_fr = (volatile unsigned int*)(uart + 0x18);
+    while (*uart_fr & (1 << 5)) {
+        asm volatile("yield" ::: "memory");
+    }
+
+    *uart = (char)c;
     return c;
 }
 
@@ -25,17 +32,19 @@ int getchar(void) {
         asm volatile("yield" ::: "memory");
     }
 
-    return *uart & 0xFF;
+    int c = *uart & 0xFF;
+    putchar(c);
+    return c;
 }
 
 char *gets(char *str) {
     char c;
-    unsigned i;
-    while (c = (char)getchar() != '\n') {
+    unsigned i = 0;
+    while ((c = (char)getchar()) != '\n' && c != '\r') {
         str[i++] = c;
     }
 
-    if (i = 0) {
+    if (i == 0) {
         return NULL;
     } else {
         str[i++] = '\0';
@@ -76,13 +85,19 @@ int printd(int num) {
     int ret = 0;
     char buffer[12];
     int i = 0;
-    
-    while (num != 0) {
+
+    if (num < 0) {
+        putchar('-');
+        ret++;
+        num = -num;
+    }
+
+    while (num > 0) {
         buffer[i++] = '0' + (num % 10);
         num /= 10;
         ret++;
     }
-    
+
     while (i > 0) {
         putchar(buffer[--i]);
     }
@@ -99,13 +114,19 @@ int printld(long num) {
     int ret = 0;
     char buffer[20];
     int i = 0;
-    
-    while (num != 0) {
+
+    if (num < 0) {
+        putchar('-');
+        ret++;
+        num = -num;
+    }
+
+    while (num > 0) {
         buffer[i++] = '0' + (num % 10);
         num /= 10;
         ret++;
     }
-    
+
     while (i > 0) {
         putchar(buffer[--i]);
     }
@@ -251,6 +272,10 @@ int printf(const char *restrict fmt, ...) {
                         p += 2;
                         break;
                     }
+
+                    default:
+                        p++;
+                        break;
                 }
             }
         } else {
@@ -260,6 +285,48 @@ int printf(const char *restrict fmt, ...) {
     }
 
     if (mmu_enabled) pthread_spin_unlock(&print_lock);
+    va_end(ap);
+    return ret;
+}
+
+int scand() {
+    char buf[64];
+    gets(buf);
+    return atoi(buf);
+}
+
+int scanf(const char *restrict format, ...) {
+    va_list ap;
+    va_start(ap, format);
+    int ret = 0;
+    const char *p = format;
+    if (mmu_enabled) {
+        pthread_spin_lock(&read_lock);
+    }
+
+    while (*p != '\0') {
+        if (*p == '%') {
+            if (*(p + 1) == 'l') {
+
+            } else {
+                switch (*(p + 1)) {
+                case 'd':
+                    int *num = va_arg(ap, int*);
+                    *num = scand();
+                    p += 2;
+                    ret++;
+                    break;
+                }
+            }
+        } else {
+            p++;
+        }
+    }
+
+    if (mmu_enabled) {
+        pthread_spin_unlock(&read_lock);
+    }
+
     va_end(ap);
     return ret;
 }

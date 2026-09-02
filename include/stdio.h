@@ -15,6 +15,7 @@ int getchar(void);
 char *gets(char *str);
 int puts(const char *str);
 int printf(const char *restrict fmt, ...);
+int scanf(const char *restrict format, ...);
 #ifdef __cplusplus
 }
 #endif
