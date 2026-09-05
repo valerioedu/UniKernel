@@ -1,4 +1,4 @@
-import os
+import socket
 import sys
 import shutil
 import subprocess
@@ -6,9 +6,23 @@ from pathlib import Path
 
 bios = r"/opt/homebrew/share/qemu/edk2-aarch64-code.fd"
 
+def is_connected(host="1.1.1.1", port=443, timeout=3) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
 def main():
     build_dir = Path("build")
+    connected = is_connected()
     if build_dir.exists():
+        if not connected:
+            efi = Path("BOOTAA64.EFI")
+            dest = Path("build/BOOTAA64.EFI")
+            if dest.exists():
+                shutil.copy2(dest, efi)
+
         shutil.rmtree(build_dir)
 
     build_dir.mkdir()
@@ -34,7 +48,16 @@ def main():
 
     subprocess.run(["mformat", "-i", "disk.img", "-F", "::"], cwd=build_dir, text=True)
 
-    subprocess.run(["curl", "-o", "BOOTAA64.EFI", "https://raw.githubusercontent.com/limine-bootloader/limine/v8.x-binary/BOOTAA64.EFI"], cwd=build_dir, text=True)
+    if connected:
+        subprocess.run(["curl", "-o", "BOOTAA64.EFI", "https://raw.githubusercontent.com/limine-bootloader/limine/v8.x-binary/BOOTAA64.EFI"], cwd=build_dir, text=True)
+    else:
+        efi = Path("BOOTAA64.EFI")
+        dest = Path("build/BOOTAA64.EFI")
+        if efi.exists():
+            shutil.copy2(efi, dest)
+        else:
+            print("UEFI not found, aborting")
+            exit(1)
 
     subprocess.run(["mmd", "-i", "disk.img", "::/EFI"], cwd=build_dir, text=True)
     subprocess.run(["mmd", "-i", "disk.img", "::/EFI/BOOT"], cwd=build_dir, text=True)
